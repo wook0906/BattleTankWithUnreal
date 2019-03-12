@@ -8,29 +8,25 @@
 ATank::ATank()
 {
  	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-
+	PrimaryActorTick.bCanEverTick = false;
 }
-
 // Called when the game starts or when spawned
-
-void ATank::BeginPlay()
-{
+void ATank::BeginPlay() {
 	Super::BeginPlay();
+	currentHealth = startingHealth;
+}
+float ATank::TakeDamage(float damageAmount, struct FDamageEvent const & damageEvent, class  AController* eventInstigator, AActor * damageCauser) {
+	int32 damagePoints = FPlatformMath::RoundToInt(damageAmount);
+	int32 damageToApply = FMath::Clamp(damagePoints, 0, currentHealth);
 	
+	currentHealth -= damageToApply;
+	if (currentHealth <= 0) {
+		OnDeath.Broadcast();
+	}
+	return damageToApply;
 }
 
-// Called every frame
-void ATank::Tick( float DeltaTime )
+float ATank::GetHealthPercent() const
 {
-	Super::Tick( DeltaTime );
-
+	return (float)currentHealth/(float)startingHealth;
 }
-
-// Called to bind functionality to input
-void ATank::SetupPlayerInputComponent(class UInputComponent* InputComponent)
-{
-	Super::SetupPlayerInputComponent(InputComponent);
-
-}
-

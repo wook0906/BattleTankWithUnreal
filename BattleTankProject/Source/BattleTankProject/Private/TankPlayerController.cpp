@@ -1,7 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
+
 #include "BattleTankProject.h"
+#include "TankAimingComponent.h"
 #include "TankPlayerController.h"
+#include "Tank.h"
 
 void ATankPlayerController::Tick(float deltaTime) {
 	Super::Tick(deltaTime);
@@ -9,33 +12,74 @@ void ATankPlayerController::Tick(float deltaTime) {
 }
 void ATankPlayerController::BeginPlay() {
 	Super::BeginPlay();
-	UE_LOG(LogTemp, Warning, TEXT("PlayerController Begin Play"));
-		auto controlledTank = GetControlledTank();
-	if (!controlledTank) {
-		UE_LOG(LogTemp, Warning, TEXT("PlayerController not possesing a tank"));
-	}
-	else {
-		UE_LOG(LogTemp, Warning, TEXT("PlayerController possesing : %s"), *controlledTank->GetName());
-	}
-}
-
-ATank* ATankPlayerController::GetControlledTank() const {
-	return Cast<ATank>(GetPawn());
-}
-void ATankPlayerController::AimTowardsCrosshair() {
-	if (!GetControlledTank()) {
+	auto aimingComponent = GetPawn()->FindComponentByClass<UTankAimingComponent>();
+	if (!ensure(aimingComponent)) {
 		return;
 	}
+	FoundAimingComponent(aimingComponent);
+}
+void ATankPlayerController::SetPawn(APawn* inPawn) {
+	Super::SetPawn(inPawn);
+	if (inPawn) {
+		auto possessedTank = Cast<ATank>(inPawn);
+		if (!ensure(possessedTank)) { return; }
+		possessedTank->OnDeath.AddUniqueDynamic(this, &ATankPlayerController::OnPossessedTankDeath);
+	}
+}
+void ATankPlayerController::OnPossessedTankDeath(){
+	StartSpectatingOnly();
+}
+void ATankPlayerController::AimTowardsCrosshair() {
+	if (!GetPawn()) { return; }
+	 auto aimingComponent = GetPawn()->FindComponentByClass<UTankAimingComponent>();
+	 if (!ensure(aimingComponent)) {
+		 return;
+	 }
 	FVector hitLocation;
-	if (GetSightRayHitLocation(hitLocation)) {
-		//UE_LOG(LogTemp, Warning, TEXT("Look Direction : %s"), *hitLocation.ToString());
+	bool bGotHitLocation = GetSightRayHitLocation(hitLocation);
+	if (bGotHitLocation) {
+		aimingComponent->AimAt(hitLocation);
 	}
 	
 }
 bool ATankPlayerController::GetSightRayHitLocation(FVector& hitLocation) const {
 	int32 viewportSizeX, viewportSizeY;
-	GetViewportSize(viewportSizeX,viewportSizeY);
+	GetViewportSize(viewportSizeX, viewportSizeY);
 	auto screenLocation = FVector2D(viewportSizeX * crosshairXLocation, viewportSizeY * crosshairYLocation);
-	UE_LOG(LogTemp, Warning, TEXT("ScreenLocation: %s"), *screenLocation.ToString());
-	return true;
+
+	FVector lookDirection;
+	if (GetLookDirection(screenLocation, lookDirection)) {
+		return GetLookVectorHitLocation(lookDirection, hitLocation);
+	}
+	return false;
 }
+bool ATankPlayerController::GetLookVectorHitLocation(FVector lookDirection, FVector& hitLocation) const {
+	FHitResult hitResult;
+	auto startLocation = PlayerCameraManager->GetCameraLocation();
+	auto endLocation = startLocation + (lookDirection*lineTraceRange);
+	if (GetWorld()->LineTraceSingleByChannel(
+		hitResult,
+		startLocation,
+		endLocation,
+		//ECollisionChannel::ECC_Visibility
+		ECollisionChannel::ECC_Camera)
+		) 
+	{
+
+		hitLocation = hitResult.Location;
+		return true;
+	}
+
+	hitLocation = FVector(0);
+	return false;
+}
+bool ATankPlayerController::GetLookDirection(FVector2D screenLocation, FVector& lookDirection) const {
+	FVector cameraWorldLocation;
+
+	return DeprojectScreenPositionToWorld(
+		screenLocation.X,
+		screenLocation.Y,
+		cameraWorldLocation,
+		lookDirection);
+}
+

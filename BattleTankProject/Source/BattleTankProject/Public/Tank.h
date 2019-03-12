@@ -2,27 +2,29 @@
 
 #pragma once
 
+
 #include "GameFramework/Pawn.h"
 #include "Tank.generated.h"
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FTankDelegate);
 
 UCLASS()
 class BATTLETANKPROJECT_API ATank : public APawn
 {
 	GENERATED_BODY()
-
-public:
 	// Sets default values for this pawn's properties
-	ATank();
+	
+public:
+		ATank();
+		virtual float TakeDamage(float damageAmount, struct FDamageEvent const & damageEvent, class  AController* eventInstigator, AActor * damageCauser) override;
+		UFUNCTION(BlueprintPure,Category = "Health")
+		float GetHealthPercent() const;
 
-	// Called when the game starts or when spawned
+		FTankDelegate OnDeath;
+private:
+	UPROPERTY(EditDefaultsOnly, Category = "Setup")
+	int32 startingHealth = 100;
+	UPROPERTY(VisibleAnywhere, Category = "Health")
+		int32 currentHealth;
 	virtual void BeginPlay() override;
-	
-	// Called every frame
-	virtual void Tick( float DeltaSeconds ) override;
-
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
-
-	
-	
 };
